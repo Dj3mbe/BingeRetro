@@ -19,6 +19,10 @@ const ui = {
   ytWrap: $("ytWrap"),
   video: $("video"),
   noise: $("static"),
+  linkCard: $("linkCard"),
+  linkTitle: $("linkTitle"),
+  linkSite: $("linkSite"),
+  linkButton: $("linkButton"),
   banner: $("banner"),
   bNum: $("bNum"),
   bTitle: $("bTitle"),
@@ -226,6 +230,24 @@ async function resolveItem(item) {
     };
   }
 
+  if (item.source === "link") {
+    let url;
+    try {
+      url = new URL(item.url);
+    } catch {
+      throw new Error("link item has an invalid URL");
+    }
+    if (url.protocol !== "https:") throw new Error("link items must use https");
+    if (!(item.durationSeconds > 0)) throw new Error(`link to ${url.hostname} needs a duration`);
+    return {
+      kind: "link",
+      url: url.href,
+      duration: item.durationSeconds,
+      title: item.title || url.hostname,
+      licence: "",
+    };
+  }
+
   throw new Error(`unknown source "${item.source}"`);
 }
 
@@ -348,6 +370,8 @@ function stopPlayback() {
   ui.video.classList.remove("on");
   ui.ytWrap.classList.remove("on");
   if (ytPlayerReady) ytPlayer.stopVideo();
+  clearTimeout(linkTimer);
+  ui.linkCard.classList.remove("on");
   active = null;
 }
 
@@ -423,10 +447,24 @@ async function playYouTube(token) {
   }
 }
 
+let linkTimer = 0;
+
+// Link items cannot be played inside the app, so they show a card and move on
+// when their scheduled time runs out.
+function playLink(entry, offset, token) {
+  ui.linkTitle.textContent = entry.title;
+  ui.linkSite.textContent = `Plays on ${new URL(entry.url).hostname}. Open it there, then come back here.`;
+  ui.linkButton.href = entry.url;
+  ui.linkCard.classList.add("on");
+  clearTimeout(linkTimer);
+  linkTimer = setTimeout(() => itemEnded(token), (entry.duration - offset) * 1000);
+}
+
 function play(entry, offset, token) {
   stopPlayback();
   active = { entry, offset, token };
   if (entry.kind === "youtube") playYouTube(token);
+  else if (entry.kind === "link") playLink(entry, offset, token);
   else playArchive(entry, offset, token);
 }
 
@@ -681,13 +719,17 @@ function nextFreeNumber() {
 function addItemRow(item = {}) {
   const row = el("div", "item-edit");
   const source = el("select");
-  source.append(new Option("archive.org", "archive"), new Option("YouTube", "youtube"));
-  source.value = item.source === "youtube" ? "youtube" : "archive";
+  source.append(
+    new Option("archive.org", "archive"),
+    new Option("YouTube", "youtube"),
+    new Option("Link (opens on site)", "link"),
+  );
+  source.value = ["youtube", "link"].includes(item.source) ? item.source : "archive";
 
   const id = el("input");
   id.type = "text";
-  id.placeholder = "identifier or video ID";
-  id.value = item.identifier || item.videoId || "";
+  id.placeholder = "identifier, video ID, or https link";
+  id.value = item.identifier || item.videoId || item.url || "";
 
   const duration = el("input");
   duration.type = "number";
@@ -736,7 +778,9 @@ function readItemRows() {
     const item =
       source.value === "youtube"
         ? { source: "youtube", videoId: value }
-        : { source: "archive", identifier: value };
+        : source.value === "link"
+          ? { source: "link", url: value }
+          : { source: "archive", identifier: value };
     if (Number(duration.value) > 0) item.durationSeconds = Number(duration.value);
     if (title.value.trim()) item.title = title.value.trim();
     items.push(item);

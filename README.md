@@ -16,6 +16,7 @@ A retro cable-style channel player with a TV guide. Lineups are built in the Set
 - Add a channel with a number, a name, and one or more items.
 - archive.org items take an identifier, the part of the URL after `/details/`. The duration is optional, and the app uses the archive's length if you leave it blank.
 - YouTube items take a video ID, the part after `v=` in the URL. A duration in seconds is required.
+- Link items ("Link (opens on site)") open a page on another site, such as a streaming service. They can't play inside the app. The app shows a card with the link and moves on when the scheduled time runs out, so set the duration to match the show.
 - Export copies your lineup to the text box. Import replaces your lineup with the text in the box. `channels.json` is an example you can import.
 - Theme changes the guide colours.
 

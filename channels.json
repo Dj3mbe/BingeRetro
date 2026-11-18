@@ -104,6 +104,30 @@
           "title": "Dragnet (1950s), full classic episodes"
         }
       ]
+    },
+    {
+      "number": 400,
+      "name": "Pluto TV (link)",
+      "items": [
+        {
+          "source": "link",
+          "url": "https://pluto.tv/",
+          "title": "Pluto TV (replace with a show page)",
+          "durationSeconds": 1800
+        }
+      ]
+    },
+    {
+      "number": 401,
+      "name": "Tubi (link)",
+      "items": [
+        {
+          "source": "link",
+          "url": "https://tubitv.com/",
+          "title": "Tubi (replace with a show page)",
+          "durationSeconds": 1800
+        }
+      ]
     }
   ]
 }
