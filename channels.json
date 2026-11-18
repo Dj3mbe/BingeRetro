@@ -2,39 +2,13 @@
   "channels": [
     {
       "number": 2,
-      "name": "Cartoon Corner",
+      "name": "Classic Ads",
       "items": [
         {
           "source": "archive",
           "identifier": "1955Chev1955",
           "title": "1955 Chevrolet Screen Ads",
           "durationSeconds": 524
-        }
-      ]
-    },
-    {
-      "number": 5,
-      "name": "Music Hour",
-      "items": [
-        {
-          "source": "youtube",
-          "videoId": "REPLACE_WITH_VIDEO_ID",
-          "title": "Sample music video",
-          "durationSeconds": 240
-        }
-      ]
-    },
-    {
-      "number": 9,
-      "name": "Classic Shorts",
-      "items": [
-        {
-          "source": "archive",
-          "identifier": "REPLACE_WITH_ARCHIVE_IDENTIFIER",
-          "file": "OPTIONAL_EXACT_FILENAME.mp4",
-          "title": "Sample short",
-          "licence": "https://creativecommons.org/publicdomain/mark/1.0/",
-          "durationSeconds": 600
         }
       ]
     }

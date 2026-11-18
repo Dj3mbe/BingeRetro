@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="classic">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,24 +17,63 @@
     <div id="bTitle"></div>
     <div id="bMeta"></div>
   </div>
-
   <div id="notice"></div>
 
   <div id="controls">
     <button id="up" type="button" aria-label="Channel up">&#9650;</button>
     <button id="down" type="button" aria-label="Channel down">&#9660;</button>
     <button id="guideBtn" type="button">Guide</button>
+    <button id="setupBtn" type="button">Setup</button>
   </div>
 
   <div id="guide">
     <h2>Program Guide</h2>
-    <table>
-      <thead>
-        <tr><th>Ch</th><th>Channel</th><th>Now</th><th>Next</th><th>Later</th></tr>
-      </thead>
-      <tbody id="guideBody"></tbody>
-    </table>
-    <p class="hint">G or Esc to close. Enter also closes.</p>
+    <div class="grid">
+      <div id="guideHead" class="g-head"></div>
+      <div id="guideBody"></div>
+    </div>
+    <p class="hint">Up/Down: channel &middot; Left/Right: 30 minutes &middot; Enter: tune &middot; G or Esc: close</p>
+  </div>
+
+  <div id="setup">
+    <div class="panel-head">
+      <h2>Setup</h2>
+      <button id="setupClose" type="button">Close</button>
+    </div>
+    <p id="setupStatus" class="hint"></p>
+
+    <h3>Channels</h3>
+    <div id="chanList"></div>
+    <button id="newChannel" type="button">New channel</button>
+
+    <section id="editor" hidden>
+      <h3 id="editorTitle">New channel</h3>
+      <label>Number <input id="fNumber" type="number" min="1" step="1"></label>
+      <label>Name <input id="fName" maxlength="40"></label>
+      <h3>Items</h3>
+      <div id="fItems"></div>
+      <button id="addItem" type="button">Add item</button>
+      <p class="hint">YouTube items need a duration in seconds. For archive.org items, leave the duration blank to use the archive's length.</p>
+      <div class="row">
+        <button id="saveChannel" type="button">Save channel</button>
+        <button id="cancelChannel" type="button">Cancel</button>
+        <button id="deleteChannel" type="button" hidden>Delete channel</button>
+      </div>
+    </section>
+
+    <h3>Theme</h3>
+    <select id="theme">
+      <option value="classic">Classic</option>
+      <option value="amber">Amber</option>
+      <option value="green">Green</option>
+    </select>
+
+    <h3>Backup</h3>
+    <textarea id="backup" rows="8" spellcheck="false"></textarea>
+    <div class="row">
+      <button id="exportBtn" type="button">Export</button>
+      <button id="importBtn" type="button">Import (replaces lineup)</button>
+    </div>
   </div>
 
   <div id="start"><span>PRESS ENTER OR CLICK TO START</span></div>

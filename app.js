@@ -1,12 +1,15 @@
 "use strict";
 
+const STORAGE_KEY = "bingeretro:v2";
+const THEMES = ["classic", "amber", "green"];
 // Shared reference point in Unix seconds. Every viewer uses the same value,
 // so everyone tuning in sees the same moment of each channel's loop.
 const EPOCH = 0;
 const BANNER_MS = 3000;
 const NUMBER_WAIT_MS = 1500;
 const STATIC_MS = 300;
-const GUIDE_WINDOW_S = 2 * 3600;
+const SLOT_S = 1800;
+const GUIDE_SPAN_S = 3 * 3600;
 const GUIDE_REFRESH_MS = 30000;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const VIDEO_FILE = /\.(mp4|m4v|webm|ogv)$/i;
@@ -21,21 +24,41 @@ const ui = {
   bTitle: $("bTitle"),
   bMeta: $("bMeta"),
   start: $("start"),
-  guide: $("guide"),
-  guideBody: $("guideBody"),
   notice: $("notice"),
   up: $("up"),
   down: $("down"),
   guideBtn: $("guideBtn"),
+  setupBtn: $("setupBtn"),
+  guide: $("guide"),
+  guideHead: $("guideHead"),
+  guideBody: $("guideBody"),
+  setup: $("setup"),
+  setupStatus: $("setupStatus"),
+  setupClose: $("setupClose"),
+  chanList: $("chanList"),
+  newChannel: $("newChannel"),
+  editor: $("editor"),
+  editorTitle: $("editorTitle"),
+  fNumber: $("fNumber"),
+  fName: $("fName"),
+  fItems: $("fItems"),
+  addItem: $("addItem"),
+  saveChannel: $("saveChannel"),
+  cancelChannel: $("cancelChannel"),
+  deleteChannel: $("deleteChannel"),
+  theme: $("theme"),
+  backup: $("backup"),
+  exportBtn: $("exportBtn"),
+  importBtn: $("importBtn"),
 };
 
-let channels = [];
-let current = 0;
+let settings = loadSettings();
+let currentNumber = null;
 let started = false;
 let muted = false;
 let tuneToken = 0;
 let failures = 0;
-let active = null; // { entry, token, offset } for the item on screen
+let active = null; // { entry, offset, token } for the item on screen
 let ytPlayer = null;
 let ytPlayerReady = false;
 let ytApi = null;
@@ -43,11 +66,24 @@ let bannerTimer = 0;
 let digitBuffer = "";
 let digitTimer = 0;
 let guideTimer = 0;
+let guideSel = 0;
+let guideStart = 0;
+let editing = null; // channel number being edited, "new", or null when closed
+
+const results = new Map(); // channel item key -> { loaded } or { error }
+const inflight = new Map(); // channel item key -> promise
 
 const fmtTime = (sec) =>
   new Date(sec * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const isOpen = (node) => node.classList.contains("on");
+const setOpen = (node, open) => node.classList.toggle("on", open);
 
-const isGuideOpen = () => ui.guide.classList.contains("on");
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
 
 function parseLength(value) {
   if (value === undefined || value === null || value === "") return null;
@@ -60,6 +96,10 @@ function parseLength(value) {
 function showNotice(message) {
   ui.notice.textContent = message;
   ui.notice.style.display = message ? "block" : "none";
+}
+
+function setupMessage(message) {
+  ui.setupStatus.textContent = message;
 }
 
 function showBanner(number, title, meta, ms = BANNER_MS) {
@@ -77,9 +117,45 @@ function showEntryBanner(ch, entry, start) {
   showBanner(`${ch.number}  ${ch.name}`, entry.title, range + licence);
 }
 
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved && Array.isArray(saved.channels)) {
+      return {
+        theme: THEMES.includes(saved.theme) ? saved.theme : "classic",
+        channels: saved.channels,
+      };
+    }
+  } catch {
+    // Unreadable settings: start with an empty lineup.
+  }
+  return { theme: "classic", channels: [] };
+}
+
+function persist() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    return true;
+  } catch {
+    showNotice("Settings could not be saved. Browser storage may be full or disabled.");
+    return false;
+  }
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = settings.theme;
+}
+
+const sortedChannels = () => [...settings.channels].sort((a, b) => a.number - b.number);
+
+function currentChannel() {
+  const list = sortedChannels();
+  return list.find((c) => c.number === currentNumber) || list[0] || null;
+}
+
 // Archive metadata is cached per identifier so repeat visits skip the network.
 async function archiveMeta(identifier) {
-  const key = `lineup-meta:${identifier}`;
+  const key = `bingeretro-meta:${identifier}`;
   try {
     const cached = JSON.parse(localStorage.getItem(key));
     if (cached) return cached;
@@ -116,9 +192,9 @@ function pickArchiveFile(files) {
 
 async function resolveItem(item) {
   if (item.source === "youtube") {
-    if (!item.videoId) throw new Error("YouTube item has no videoId");
+    if (!item.videoId) throw new Error("YouTube item has no video ID");
     if (!(item.durationSeconds > 0)) {
-      throw new Error(`YouTube ${item.videoId} needs durationSeconds`);
+      throw new Error(`YouTube ${item.videoId} needs a duration`);
     }
     return {
       kind: "youtube",
@@ -138,7 +214,7 @@ async function resolveItem(item) {
     if (!file) throw new Error(`no playable video file in "${item.identifier}"`);
     const duration = item.durationSeconds > 0 ? item.durationSeconds : file.length;
     if (!(duration > 0)) {
-      throw new Error(`no duration for "${item.identifier}"; add durationSeconds`);
+      throw new Error(`no duration for "${item.identifier}"; add one in Setup`);
     }
     const path = file.name.split("/").map(encodeURIComponent).join("/");
     return {
@@ -153,32 +229,40 @@ async function resolveItem(item) {
   throw new Error(`unknown source "${item.source}"`);
 }
 
-// Resolves every item in a channel once. Items that fail are skipped and logged.
-function loadChannel(ch) {
-  if (!ch.loading) {
-    ch.loading = (async () => {
-      const entries = [];
-      const skipped = [];
-      for (const item of ch.items || []) {
-        try {
-          entries.push({ ...(await resolveItem(item)), index: entries.length });
-        } catch (err) {
-          skipped.push(err.message);
-          console.warn(`Channel ${ch.number}: ${err.message}`);
-        }
-      }
-      if (!entries.length) throw new Error("no playable items");
-      const total = entries.reduce((sum, e) => sum + e.duration, 0);
-      ch.error = "";
-      ch.loaded = { entries, total, skipped };
-      return ch.loaded;
-    })();
-    ch.loading.catch((err) => {
-      ch.error = err.message;
-      ch.loading = null;
-    });
+async function resolveChannel(items) {
+  if (!items.length) throw new Error("no items yet");
+  const entries = [];
+  for (const item of items) {
+    try {
+      entries.push({ ...(await resolveItem(item)), index: entries.length });
+    } catch (err) {
+      console.warn(err.message);
+    }
   }
-  return ch.loading;
+  if (!entries.length) throw new Error("no playable items");
+  const total = entries.reduce((sum, e) => sum + e.duration, 0);
+  return { entries, total };
+}
+
+const keyOf = (ch) => JSON.stringify(ch.items);
+
+function loadChannel(ch) {
+  const key = keyOf(ch);
+  if (!inflight.has(key)) {
+    const promise = resolveChannel(ch.items).then(
+      (loaded) => {
+        results.set(key, { loaded });
+        return loaded;
+      },
+      (err) => {
+        results.set(key, { error: err.message });
+        inflight.delete(key);
+        throw err;
+      },
+    );
+    inflight.set(key, promise);
+  }
+  return inflight.get(key);
 }
 
 // Where a channel is in its loop at time t (seconds).
@@ -278,7 +362,7 @@ function itemFailed(token, reason) {
   console.warn(`Playback failed (${reason}): ${active.entry.title}`);
   if (failures > MAX_CONSECUTIVE_FAILURES) {
     stopPlayback();
-    showNotice("Several items in this channel failed to play. Check the console or channels.json.");
+    showNotice("Several items in this channel failed to play. Check the console or the lineup in Setup.");
     return;
   }
   tune(active.entry.index);
@@ -347,8 +431,13 @@ function play(entry, offset, token) {
 }
 
 async function tune(skipIndex = null) {
-  const ch = channels[current];
-  if (!ch) return;
+  const ch = currentChannel();
+  if (!ch) {
+    stopPlayback();
+    showBanner("", "No channels yet", "Press S or tap Setup to add one");
+    return;
+  }
+  currentNumber = ch.number;
   const token = ++tuneToken;
   showNotice("");
   const noise = staticNoise(STATIC_MS);
@@ -380,22 +469,25 @@ async function tune(skipIndex = null) {
 }
 
 function changeChannel(step) {
-  current = (current + step + channels.length) % channels.length;
+  const list = sortedChannels();
+  if (!list.length) return;
+  const index = Math.max(0, list.findIndex((c) => c.number === currentNumber));
+  currentNumber = list[(index + step + list.length) % list.length].number;
   failures = 0;
   tune();
-  if (isGuideOpen()) renderGuide();
+  if (isOpen(ui.guide)) renderGuide();
 }
 
 function tuneNumber(number) {
-  const index = channels.findIndex((c) => c.number === number);
-  if (index === -1) {
+  const match = settings.channels.find((c) => c.number === number);
+  if (!match) {
     showNotice(`No channel ${number}`);
     return;
   }
-  current = index;
+  currentNumber = number;
   failures = 0;
   tune();
-  if (isGuideOpen()) renderGuide();
+  if (isOpen(ui.guide)) renderGuide();
 }
 
 function pushDigit(digit) {
@@ -413,9 +505,10 @@ function pushDigit(digit) {
 }
 
 function showInfo() {
-  const ch = channels[current];
-  if (!ch || !ch.loaded) return;
-  const { entry, start } = positionAt(ch.loaded, Date.now() / 1000);
+  const ch = currentChannel();
+  const loaded = ch && results.get(keyOf(ch))?.loaded;
+  if (!loaded) return;
+  const { entry, start } = positionAt(loaded, Date.now() / 1000);
   showEntryBanner(ch, entry, start);
 }
 
@@ -429,62 +522,320 @@ function toggleMute() {
   showBanner("", muted ? "Muted" : "Sound on", "", 1200);
 }
 
-function cell(text, className) {
-  const td = document.createElement("td");
-  td.textContent = text;
-  if (className) td.className = className;
-  return td;
-}
-
 function renderGuide() {
   const now = Date.now() / 1000;
+  const list = sortedChannels();
+  const windowEnd = guideStart + GUIDE_SPAN_S;
+  guideSel = Math.min(guideSel, Math.max(0, list.length - 1));
+
+  const head = el("div", "track");
+  for (let t = guideStart; t < windowEnd; t += SLOT_S) {
+    const tick = el("div", "tick", fmtTime(t));
+    tick.style.left = `${((t - guideStart) / GUIDE_SPAN_S) * 100}%`;
+    head.append(tick);
+  }
+  ui.guideHead.replaceChildren(el("div", "label", "Channel"), head);
+
   ui.guideBody.replaceChildren();
+  if (!list.length) {
+    ui.guideBody.append(el("p", "hint", "No channels yet. Open Setup to add some."));
+    return;
+  }
 
-  channels.forEach((ch, i) => {
-    const tr = document.createElement("tr");
-    if (i === current) tr.className = "current";
-    tr.append(cell(String(ch.number)), cell(ch.name));
+  list.forEach((ch, i) => {
+    const row = el("div", i === guideSel ? "grow sel" : "grow");
+    row.append(el("div", "label", `${ch.number}  ${ch.name}`));
+    const track = el("div", "track");
+    const result = results.get(keyOf(ch));
 
-    if (ch.loaded) {
-      const slots = upcoming(ch.loaded, now, GUIDE_WINDOW_S).slice(0, 3);
-      for (let k = 0; k < 3; k++) {
-        const slot = slots[k];
-        if (!slot) {
-          tr.append(cell(""));
-          continue;
-        }
-        const td = document.createElement("td");
-        const time = document.createElement("div");
-        time.className = "time";
-        time.textContent = fmtTime(slot.start);
-        td.append(time, slot.entry.title);
-        tr.append(td);
+    if (result?.loaded) {
+      for (const slot of upcoming(result.loaded, guideStart, GUIDE_SPAN_S)) {
+        const start = Math.max(slot.start, guideStart);
+        const end = Math.min(slot.start + slot.entry.duration, windowEnd);
+        if (end <= start) continue;
+        const prog = el("div", "prog", slot.entry.title);
+        prog.style.left = `${((start - guideStart) / GUIDE_SPAN_S) * 100}%`;
+        prog.style.width = `${((end - start) / GUIDE_SPAN_S) * 100}%`;
+        prog.title = `${fmtTime(slot.start)} to ${fmtTime(slot.start + slot.entry.duration)}`;
+        track.append(prog);
       }
     } else {
-      const td = cell(ch.error ? `Unavailable: ${ch.error}` : "Loading...");
-      td.colSpan = 3;
-      tr.append(td);
+      const text = result?.error ? `Unavailable: ${result.error}` : "Loading...";
+      track.append(el("div", "prog msg", text));
     }
-    ui.guideBody.append(tr);
+
+    if (now >= guideStart && now < windowEnd) {
+      const line = el("div", "nowline");
+      line.style.left = `${((now - guideStart) / GUIDE_SPAN_S) * 100}%`;
+      track.append(line);
+    }
+    row.append(track);
+    ui.guideBody.append(row);
   });
 }
 
-function toggleGuide(force) {
-  const open = force ?? !isGuideOpen();
-  ui.guide.classList.toggle("on", open);
+function openGuide() {
+  const list = sortedChannels();
+  if (!list.length) {
+    showNotice("Add a channel in Setup first.");
+    return;
+  }
+  guideSel = Math.max(0, list.findIndex((c) => c.number === currentNumber));
+  guideStart = Math.floor(Date.now() / 1000 / SLOT_S) * SLOT_S;
+  setOpen(ui.guide, true);
+  list.forEach((ch) => loadChannel(ch).catch(() => {}));
+  renderGuide();
   clearInterval(guideTimer);
-  if (open) {
-    channels.forEach((ch) => loadChannel(ch).catch(() => {}));
-    renderGuide();
-    guideTimer = setInterval(renderGuide, GUIDE_REFRESH_MS);
+  guideTimer = setInterval(renderGuide, GUIDE_REFRESH_MS);
+}
+
+function closeGuide() {
+  setOpen(ui.guide, false);
+  clearInterval(guideTimer);
+}
+
+function toggleGuide() {
+  if (isOpen(ui.guide)) closeGuide();
+  else openGuide();
+}
+
+function guideKey(e) {
+  const list = sortedChannels();
+  switch (e.key) {
+    case "ArrowUp":
+      e.preventDefault();
+      guideSel = Math.max(0, guideSel - 1);
+      renderGuide();
+      break;
+    case "ArrowDown":
+      e.preventDefault();
+      guideSel = Math.min(list.length - 1, guideSel + 1);
+      renderGuide();
+      break;
+    case "ArrowLeft":
+      e.preventDefault();
+      guideStart -= SLOT_S;
+      renderGuide();
+      break;
+    case "ArrowRight":
+      e.preventDefault();
+      guideStart += SLOT_S;
+      renderGuide();
+      break;
+    case "Enter":
+      if (list[guideSel]) {
+        currentNumber = list[guideSel].number;
+        failures = 0;
+        closeGuide();
+        tune();
+      }
+      break;
+    case "g":
+    case "G":
+      closeGuide();
+      break;
+    default:
   }
 }
 
+// Setup panel
+
+function openSetup() {
+  setOpen(ui.setup, true);
+  closeEditor();
+  setupMessage("");
+  ui.theme.value = settings.theme;
+  renderChannelList();
+}
+
+function closeSetup() {
+  setOpen(ui.setup, false);
+  closeEditor();
+}
+
+function toggleSetup() {
+  if (isOpen(ui.setup)) closeSetup();
+  else openSetup();
+}
+
+function renderChannelList() {
+  ui.chanList.replaceChildren();
+  const list = sortedChannels();
+  if (!list.length) ui.chanList.append(el("p", "hint", "No channels yet."));
+  for (const ch of list) {
+    const row = el("div", "item-row");
+    const count = ch.items.length;
+    row.append(el("span", "", `${ch.number}  ${ch.name}  (${count} item${count === 1 ? "" : "s"})`));
+    const edit = el("button", "", "Edit");
+    edit.type = "button";
+    edit.addEventListener("click", () => openEditor(ch.number));
+    row.append(edit);
+    ui.chanList.append(row);
+  }
+}
+
+function nextFreeNumber() {
+  return settings.channels.length ? Math.max(...settings.channels.map((c) => c.number)) + 1 : 1;
+}
+
+function addItemRow(item = {}) {
+  const row = el("div", "item-edit");
+  const source = el("select");
+  source.append(new Option("archive.org", "archive"), new Option("YouTube", "youtube"));
+  source.value = item.source === "youtube" ? "youtube" : "archive";
+
+  const id = el("input");
+  id.type = "text";
+  id.placeholder = "identifier or video ID";
+  id.value = item.identifier || item.videoId || "";
+
+  const duration = el("input");
+  duration.type = "number";
+  duration.min = "1";
+  duration.placeholder = "seconds";
+  duration.value = item.durationSeconds ?? "";
+
+  const title = el("input");
+  title.type = "text";
+  title.placeholder = "title (optional)";
+  title.value = item.title || "";
+
+  const remove = el("button", "", "Remove");
+  remove.type = "button";
+  remove.addEventListener("click", () => row.remove());
+
+  row.append(source, id, duration, title, remove);
+  ui.fItems.append(row);
+}
+
+function openEditor(number) {
+  const ch = number === null ? null : settings.channels.find((c) => c.number === number);
+  editing = ch ? ch.number : "new";
+  ui.editorTitle.textContent = ch ? `Edit channel ${ch.number}` : "New channel";
+  ui.fNumber.value = ch ? ch.number : nextFreeNumber();
+  ui.fName.value = ch ? ch.name : "";
+  ui.fItems.replaceChildren();
+  (ch ? ch.items : [{}]).forEach((item) => addItemRow(item));
+  ui.deleteChannel.hidden = !ch;
+  ui.deleteChannel.dataset.armed = "";
+  ui.deleteChannel.textContent = "Delete channel";
+  ui.editor.hidden = false;
+}
+
+function closeEditor() {
+  editing = null;
+  ui.editor.hidden = true;
+}
+
+function readItemRows() {
+  const items = [];
+  for (const row of ui.fItems.children) {
+    const [source, id, duration, title] = row.querySelectorAll("select, input");
+    const value = id.value.trim();
+    if (!value) continue;
+    const item =
+      source.value === "youtube"
+        ? { source: "youtube", videoId: value }
+        : { source: "archive", identifier: value };
+    if (Number(duration.value) > 0) item.durationSeconds = Number(duration.value);
+    if (title.value.trim()) item.title = title.value.trim();
+    items.push(item);
+  }
+  return items;
+}
+
+function saveChannel() {
+  const previous = editing;
+  const number = Number(ui.fNumber.value);
+  const name = ui.fName.value.trim();
+  const items = readItemRows();
+
+  if (!Number.isInteger(number) || number < 1) {
+    setupMessage("Channel number must be a whole number of 1 or more.");
+    return;
+  }
+  if (!name) {
+    setupMessage("Give the channel a name.");
+    return;
+  }
+  if (settings.channels.some((c) => c.number === number && c.number !== previous)) {
+    setupMessage(`Channel ${number} is already in use.`);
+    return;
+  }
+  if (!items.length) {
+    setupMessage("Add at least one item with an ID.");
+    return;
+  }
+
+  const channel = { number, name, items };
+  if (previous === "new") {
+    settings.channels.push(channel);
+  } else {
+    settings.channels = settings.channels.map((c) => (c.number === previous ? channel : c));
+  }
+  if (!persist()) return;
+
+  if (currentNumber === null || currentNumber === previous) currentNumber = number;
+  closeEditor();
+  renderChannelList();
+  setupMessage("Saved.");
+}
+
+function deleteChannel() {
+  if (editing === "new") return;
+  if (ui.deleteChannel.dataset.armed !== "yes") {
+    ui.deleteChannel.dataset.armed = "yes";
+    ui.deleteChannel.textContent = "Click again to delete";
+    return;
+  }
+  settings.channels = settings.channels.filter((c) => c.number !== editing);
+  if (currentNumber === editing) currentNumber = null;
+  if (!persist()) return;
+  closeEditor();
+  renderChannelList();
+  setupMessage("Channel deleted.");
+}
+
+function exportBackup() {
+  ui.backup.value = JSON.stringify({ theme: settings.theme, channels: settings.channels }, null, 2);
+  ui.backup.select();
+  setupMessage("Copy the text above to keep a backup.");
+}
+
+function importBackup() {
+  let data;
+  try {
+    data = JSON.parse(ui.backup.value);
+  } catch {
+    setupMessage("That text is not valid JSON.");
+    return;
+  }
+  if (!data || !Array.isArray(data.channels)) {
+    setupMessage("Expected an object with a channels list.");
+    return;
+  }
+  const channels = data.channels.filter(
+    (c) => Number.isInteger(c?.number) && typeof c?.name === "string" && Array.isArray(c?.items),
+  );
+  settings = {
+    theme: THEMES.includes(data.theme) ? data.theme : settings.theme,
+    channels,
+  };
+  if (!persist()) return;
+  applyTheme();
+  ui.theme.value = settings.theme;
+  currentNumber = null;
+  closeEditor();
+  renderChannelList();
+  setupMessage(`Imported ${channels.length} channel${channels.length === 1 ? "" : "s"}.`);
+}
+
 function startViewing() {
-  if (started || !channels.length) return;
+  if (started) return;
   started = true;
   ui.start.style.display = "none";
-  tune();
+  if (!settings.channels.length) openSetup();
+  else tune();
 }
 
 document.addEventListener("keydown", (e) => {
@@ -495,7 +846,24 @@ document.addEventListener("keydown", (e) => {
     }
     return;
   }
+
+  if (e.key === "Escape") {
+    if (isOpen(ui.guide)) closeGuide();
+    else if (isOpen(ui.setup)) closeSetup();
+    return;
+  }
+
+  const typing =
+    e.target instanceof HTMLInputElement ||
+    e.target instanceof HTMLTextAreaElement ||
+    e.target instanceof HTMLSelectElement;
+  if (typing) return;
   if (e.target instanceof HTMLButtonElement && (e.key === "Enter" || e.key === " ")) return;
+  if (isOpen(ui.setup)) return;
+  if (isOpen(ui.guide)) {
+    guideKey(e);
+    return;
+  }
 
   switch (e.key) {
     case "ArrowUp":
@@ -514,16 +882,16 @@ document.addEventListener("keydown", (e) => {
     case "G":
       toggleGuide();
       break;
-    case "Escape":
-      toggleGuide(false);
+    case "s":
+    case "S":
+      toggleSetup();
       break;
     case "m":
     case "M":
       toggleMute();
       break;
     case "Enter":
-      if (isGuideOpen()) toggleGuide(false);
-      else showInfo();
+      showInfo();
       break;
     default:
       if (/^[0-9]$/.test(e.key)) pushDigit(e.key);
@@ -533,14 +901,20 @@ document.addEventListener("keydown", (e) => {
 ui.start.addEventListener("click", startViewing);
 ui.up.addEventListener("click", () => changeChannel(1));
 ui.down.addEventListener("click", () => changeChannel(-1));
-ui.guideBtn.addEventListener("click", () => toggleGuide());
+ui.guideBtn.addEventListener("click", toggleGuide);
+ui.setupBtn.addEventListener("click", toggleSetup);
+ui.setupClose.addEventListener("click", closeSetup);
+ui.newChannel.addEventListener("click", () => openEditor(null));
+ui.addItem.addEventListener("click", () => addItemRow());
+ui.saveChannel.addEventListener("click", saveChannel);
+ui.cancelChannel.addEventListener("click", closeEditor);
+ui.deleteChannel.addEventListener("click", deleteChannel);
+ui.theme.addEventListener("change", () => {
+  settings.theme = ui.theme.value;
+  persist();
+  applyTheme();
+});
+ui.exportBtn.addEventListener("click", exportBackup);
+ui.importBtn.addEventListener("click", importBackup);
 
-async function init() {
-  const res = await fetch("channels.json", { cache: "no-cache" });
-  if (!res.ok) throw new Error(`channels.json returned ${res.status}`);
-  const data = await res.json();
-  channels = [...(data.channels || [])].sort((a, b) => a.number - b.number);
-  if (!channels.length) throw new Error("channels.json has no channels");
-}
-
-init().catch((err) => showNotice(`Could not load channels: ${err.message}`));
+applyTheme();
