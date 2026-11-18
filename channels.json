@@ -1,0 +1,42 @@
+{
+  "channels": [
+    {
+      "number": 2,
+      "name": "Cartoon Corner",
+      "items": [
+        {
+          "source": "archive",
+          "identifier": "REPLACE_WITH_ARCHIVE_IDENTIFIER",
+          "title": "Sample cartoon",
+          "durationSeconds": 1320
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "name": "Music Hour",
+      "items": [
+        {
+          "source": "youtube",
+          "videoId": "REPLACE_WITH_VIDEO_ID",
+          "title": "Sample music video",
+          "durationSeconds": 240
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "name": "Classic Shorts",
+      "items": [
+        {
+          "source": "archive",
+          "identifier": "REPLACE_WITH_ARCHIVE_IDENTIFIER",
+          "file": "OPTIONAL_EXACT_FILENAME.mp4",
+          "title": "Sample short",
+          "licence": "https://creativecommons.org/publicdomain/mark/1.0/",
+          "durationSeconds": 600
+        }
+      ]
+    }
+  ]
+}

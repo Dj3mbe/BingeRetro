@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BingeRetro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="ytWrap" class="layer"><div id="ytHost"></div></div>
+  <video id="video" class="layer" playsinline></video>
+  <canvas id="static" class="layer"></canvas>
+  <div id="crt"></div>
+
+  <div id="banner">
+    <div id="bNum"></div>
+    <div id="bTitle"></div>
+    <div id="bMeta"></div>
+  </div>
+
+  <div id="notice"></div>
+
+  <div id="controls">
+    <button id="up" type="button" aria-label="Channel up">&#9650;</button>
+    <button id="down" type="button" aria-label="Channel down">&#9660;</button>
+    <button id="guideBtn" type="button">Guide</button>
+  </div>
+
+  <div id="guide">
+    <h2>Program Guide</h2>
+    <table>
+      <thead>
+        <tr><th>Ch</th><th>Channel</th><th>Now</th><th>Next</th><th>Later</th></tr>
+      </thead>
+      <tbody id="guideBody"></tbody>
+    </table>
+    <p class="hint">G or Esc to close. Enter also closes.</p>
+  </div>
+
+  <div id="start"><span>PRESS ENTER OR CLICK TO START</span></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
