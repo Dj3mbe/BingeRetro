@@ -11,6 +11,17 @@
           "durationSeconds": 524
         }
       ]
+    },
+    {
+      "number": 3,
+      "name": "Election Ads",
+      "items": [
+        {
+          "source": "archive",
+          "identifier": "Election_Ads",
+          "title": "1960 Presidential Campaign Election Commercials"
+        }
+      ]
     }
   ]
 }

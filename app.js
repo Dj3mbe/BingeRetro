@@ -830,10 +830,11 @@ function importBackup() {
   setupMessage(`Imported ${channels.length} channel${channels.length === 1 ? "" : "s"}.`);
 }
 
-function startViewing() {
+async function startViewing() {
   if (started) return;
   started = true;
   ui.start.style.display = "none";
+  await seeding;
   if (!settings.channels.length) openSetup();
   else tune();
 }
@@ -917,4 +918,21 @@ ui.theme.addEventListener("change", () => {
 ui.exportBtn.addEventListener("click", exportBackup);
 ui.importBtn.addEventListener("click", importBackup);
 
+// First visit only: load the starter lineup from channels.json.
+async function seedStarterLineup() {
+  if (localStorage.getItem(STORAGE_KEY)) return;
+  try {
+    const res = await fetch("channels.json", { cache: "no-cache" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.channels)) {
+      settings.channels = data.channels;
+      persist();
+    }
+  } catch {
+    // No starter lineup available: the user adds channels in Setup.
+  }
+}
+
+const seeding = seedStarterLineup();
 applyTheme();
