@@ -2,6 +2,9 @@
 
 const STORAGE_KEY = "bingeretro:v2";
 const THEMES = ["classic", "amber", "green"];
+// Bump this when channels.json gains channels. Saved lineups get the new
+// starter channels added once, keeping any channel numbers already in use.
+const STARTER_VERSION = 3;
 // Shared reference point in Unix seconds. Every viewer uses the same value,
 // so everyone tuning in sees the same moment of each channel's loop.
 const EPOCH = 0;
@@ -128,6 +131,7 @@ function loadSettings() {
       return {
         theme: THEMES.includes(saved.theme) ? saved.theme : "classic",
         channels: saved.channels,
+        starterVersion: saved.starterVersion || 0,
       };
     }
   } catch {
@@ -567,7 +571,8 @@ function renderGuide() {
   guideSel = Math.min(guideSel, Math.max(0, list.length - 1));
 
   const head = el("div", "track");
-  for (let t = guideStart; t < windowEnd; t += SLOT_S) {
+  const tickStep = window.innerWidth < 600 ? 3600 : SLOT_S;
+  for (let t = guideStart; t < windowEnd; t += tickStep) {
     const tick = el("div", "tick", fmtTime(t));
     tick.style.left = `${((t - guideStart) / GUIDE_SPAN_S) * 100}%`;
     head.append(tick);
@@ -962,17 +967,19 @@ ui.theme.addEventListener("change", () => {
 ui.exportBtn.addEventListener("click", exportBackup);
 ui.importBtn.addEventListener("click", importBackup);
 
-// First visit only: load the starter lineup from channels.json.
+// Adds starter channels from channels.json that the saved lineup doesn't have yet.
 async function seedStarterLineup() {
-  if (localStorage.getItem(STORAGE_KEY)) return;
+  if (settings.starterVersion >= STARTER_VERSION) return;
   try {
     const res = await fetch("channels.json", { cache: "no-cache" });
     if (!res.ok) return;
     const data = await res.json();
     if (Array.isArray(data.channels)) {
-      settings.channels = data.channels;
-      persist();
+      const used = new Set(settings.channels.map((c) => c.number));
+      settings.channels.push(...data.channels.filter((c) => !used.has(c.number)));
     }
+    settings.starterVersion = STARTER_VERSION;
+    persist();
   } catch {
     // No starter lineup available: the user adds channels in Setup.
   }

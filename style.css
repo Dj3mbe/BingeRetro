@@ -242,6 +242,16 @@ textarea:focus-visible {
   pointer-events: none;
 }
 
+@media (max-width: 600px) {
+  #guide { padding: 14px 12px; }
+  #guide h2 { font-size: 1.1rem; }
+  .g-head,
+  .grow { grid-template-columns: 110px 1fr; }
+  .label { font-size: 0.85rem; padding: 6px; }
+  .tick { font-size: 0.75rem; }
+  .prog { font-size: 0.8rem; }
+}
+
 #guide .hint,
 #setup .hint {
   margin: 12px 0 0;
