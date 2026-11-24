@@ -1,0 +1,6 @@
+{
+  "name": "BingeTV",
+  "description": "Live 24/7 classic cable TV, synchronized channel guide, and retro broadcast channels powered by BackWhenTV sources.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

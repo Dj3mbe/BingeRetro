@@ -1,90 +1,33 @@
 <!doctype html>
-<html lang="en" data-theme="classic">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BingeRetro</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div id="ytWrap" class="layer"><div id="ytHost"></div></div>
-  <video id="video" class="layer" playsinline></video>
-  <canvas id="static" class="layer"></canvas>
-  <div id="linkCard" class="layer">
-    <div class="link-box">
-      <div id="linkTitle"></div>
-      <div id="linkSite"></div>
-      <a id="linkButton" target="_blank" rel="noopener noreferrer">Open on site</a>
-    </div>
-  </div>
-  <div id="crt"></div>
-
-  <div id="banner">
-    <div id="bNum"></div>
-    <div id="bTitle"></div>
-    <div id="bMeta"></div>
-  </div>
-  <div id="notice"></div>
-
-  <div id="controls">
-    <button id="up" type="button" aria-label="Channel up">&#9650;</button>
-    <button id="down" type="button" aria-label="Channel down">&#9660;</button>
-    <button id="guideBtn" type="button">Guide</button>
-    <button id="setupBtn" type="button">Setup</button>
-  </div>
-
-  <div id="guide">
-    <h2>Program Guide</h2>
-    <div class="grid">
-      <div id="guideHead" class="g-head"></div>
-      <div id="guideBody"></div>
-    </div>
-    <p class="hint">Up/Down: channel &middot; Left/Right: 30 minutes &middot; Enter: tune &middot; G or Esc: close</p>
-  </div>
-
-  <div id="setup">
-    <div class="panel-head">
-      <h2>Setup</h2>
-      <button id="setupClose" type="button">Close</button>
-    </div>
-    <p id="setupStatus" class="hint"></p>
-
-    <h3>Channels</h3>
-    <div id="chanList"></div>
-    <button id="newChannel" type="button">New channel</button>
-
-    <section id="editor" hidden>
-      <h3 id="editorTitle">New channel</h3>
-      <label>Number <input id="fNumber" type="number" min="1" step="1"></label>
-      <label>Name <input id="fName" maxlength="40"></label>
-      <h3>Items</h3>
-      <div id="fItems"></div>
-      <button id="addItem" type="button">Add item</button>
-      <p class="hint">YouTube items need a duration in seconds. For archive.org items, leave the duration blank to use the archive's length.</p>
-      <div class="row">
-        <button id="saveChannel" type="button">Save channel</button>
-        <button id="cancelChannel" type="button">Cancel</button>
-        <button id="deleteChannel" type="button" hidden>Delete channel</button>
-      </div>
-    </section>
-
-    <h3>Theme</h3>
-    <select id="theme">
-      <option value="classic">Classic</option>
-      <option value="amber">Amber</option>
-      <option value="green">Green</option>
-    </select>
-
-    <h3>Backup</h3>
-    <textarea id="backup" rows="8" spellcheck="false"></textarea>
-    <div class="row">
-      <button id="exportBtn" type="button">Export</button>
-      <button id="importBtn" type="button">Import (replaces lineup)</button>
-    </div>
-  </div>
-
-  <div id="start"><span>PRESS ENTER OR CLICK TO START</span></div>
-
-  <script src="app.js"></script>
-</body>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09080D" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BingeRetro" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>BingeRetro — Live Classic Cable &amp; Channel Guide</title>
+    <meta name="description" content="Watch 200+ live 24/7 classic cable channels, Saturday morning cartoons, vintage sitcoms, movies, and WeatherStar local radar." />
+    <meta property="og:title" content="BingeRetro — Live Classic Cable &amp; Channel Guide" />
+    <meta property="og:description" content="Watch 200+ live 24/7 classic cable channels, Saturday morning cartoons, vintage sitcoms, movies, and WeatherStar local radar." />
+    <meta property="og:image" content="/pwa-512x512.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://siloh-ns1.plutotv.net" crossorigin />
+    <link rel="preconnect" href="https://archive.org" crossorigin />
+    <link rel="preconnect" href="https://www.youtube-nocookie.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-[#09080D] text-[#F5F3EE] antialiased selection:bg-[#DFBA57]/30 selection:text-[#F6E2A0]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

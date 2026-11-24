@@ -1,0 +1,46 @@
+name: Build APK
+
+on:
+  push:
+    tags:
+      - 'apk-*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          code=1
+          if [[ "$GITHUB_REF_NAME" == apk-* ]]; then code="${GITHUB_REF_NAME#apk-}"; fi
+          gradle assembleDebug -PVERSION_CODE="$code"
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk BingeRetro.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BingeRetro-apk
+          path: BingeRetro.apk
+
+      - name: Publish release for Downloader
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BingeRetro.apk

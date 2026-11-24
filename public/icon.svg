@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#331259"/>
+      <stop offset="100%" stop-color="#170929"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="120" y1="70" x2="392" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F7E096"/>
+      <stop offset="50%" stop-color="#DFBA57"/>
+      <stop offset="100%" stop-color="#A67A1E"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="10" y="10" width="492" height="492" rx="102" stroke="url(#gold)" stroke-opacity="0.35" stroke-width="6"/>
+  <!-- Royal Crown -->
+  <path d="M168 164L188 102L228 134L256 84L284 134L324 102L344 164H168Z" fill="url(#gold)"/>
+  <rect x="164" y="164" width="184" height="22" rx="8" fill="url(#gold)"/>
+  <circle cx="188" cy="96" r="8" fill="#F7E096"/>
+  <circle cx="256" cy="78" r="10" fill="#F7E096"/>
+  <circle cx="324" cy="96" r="8" fill="#F7E096"/>
+  <!-- Retro TV -->
+  <rect x="96" y="192" width="320" height="232" rx="34" fill="#2A1048" stroke="url(#gold)" stroke-width="14"/>
+  <rect x="128" y="220" width="256" height="148" rx="20" fill="#130722" stroke="url(#gold)" stroke-opacity="0.55" stroke-width="6"/>
+  <path d="M234 264L294 294L234 324V264Z" fill="url(#gold)"/>
+  <!-- TV Speaker & Dials -->
+  <circle cx="148" cy="396" r="12" fill="url(#gold)"/>
+  <rect x="188" y="390" width="136" height="12" rx="6" fill="url(#gold)" fill-opacity="0.75"/>
+  <circle cx="364" cy="396" r="12" fill="url(#gold)"/>
+</svg>
